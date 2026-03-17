@@ -1,8 +1,5 @@
 package com.example.mx_record;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-
 //import lombok.extern.slf4j.Slf4j;
 
 import java.io.*;
@@ -11,8 +8,7 @@ import java.util.*;
 import javax.naming.*;
 import javax.naming.directory.*;
 
-//@Slf4j
-@SpringBootApplication
+
 public class MxRecordApplication {
 
 	public static void main(String args[]) {
@@ -33,16 +29,19 @@ public class MxRecordApplication {
 				"tvf@tvf.cz", //true ?
 		};
 		for (int i = 0; i < testData.length; i++) {
+//			System.out.println("Check email: " + testData[i]); // this
+
 			System.out.println(testData[i] + " is valid: " +
-					isAddressValid(testData[i]));
+					isAddressValid(testData[i]) + "\n\n");
 		}
-		return;
+//		return;
 	}
 	private static int hear(BufferedReader in) throws IOException {
 		String line = null;
 		int res = 0;
 		while ((line = in.readLine()) != null) {
 			String pfx = line.substring(0, 3);
+//			System.out.println("line = " + line);  // this
 			try {
 				res = Integer.parseInt(pfx);
 			}
@@ -51,13 +50,15 @@ public class MxRecordApplication {
 			}
 			if (line.charAt(3) != '-') break;
 		}
+//		System.out.println("res = " + res);  // this
 		return res;
 	}
 	private static void say(BufferedWriter wr, String text)
 			throws IOException {
 		wr.write(text + "\r\n");
+//		System.out.println("Mess = " + text);	 // this
 		wr.flush();
-		return;
+//		return;
 	}
 
 	private static ArrayList getMX(String hostName)
@@ -86,6 +87,7 @@ public class MxRecordApplication {
 		while (en.hasMore()) {
 			String mailhost;
 			String x = (String) en.next();
+//			System.out.println("x = " + x);
 			String f[] = x.split(" ");
 			//THE fix *************
 			if (f.length == 1) mailhost = f[0];
@@ -93,9 +95,7 @@ public class MxRecordApplication {
 			else mailhost = f[1];
 			// THE fix *************
 			res.add(mailhost);
-//			if (f[1].endsWith("."))
-//				f[1] = f[1].substring(0, (f[1].length() - 1));
-//			res.add(f[1]);
+
 		}
 		return res;
 	}
@@ -110,7 +110,7 @@ public class MxRecordApplication {
 		ArrayList mxList = null;
 		try {
 			mxList = getMX(domain);
-			System.out.println(mxList);
+//			System.out.println(mxList);	 // this
 		}
 		catch (NamingException ex) {
 			return false;
@@ -123,58 +123,52 @@ public class MxRecordApplication {
 		// a message [store and forwarder for example] and another [like
 		// the actual mail server] to reject it. This is why we REALLY ought
 		// to take the preference into account.
-		for (int mx = 0; mx < mxList.size(); mx++) {
-			boolean valid = false;
-			try {
-				int res;
-				Socket skt = new Socket((String) mxList.get(mx), 25);
-				BufferedReader rdr = new BufferedReader
-						(new InputStreamReader(skt.getInputStream()));
-				BufferedWriter wtr = new BufferedWriter
-						(new OutputStreamWriter(skt.getOutputStream()));
-				res = hear(rdr);
-				if (res != 220) throw new Exception("Invalid header");
-				say(wtr, "EHLO gmail.com");
-				res = hear(rdr);
-				if (res != 250) throw new Exception("Not ESMTP");
-				// validate the sender address
-				say(wtr, "MAIL FROM: <0xyz.abc2001@gmail.com>"); // valid mail nam.nlh2001 lnhat14333 0xyz.abc2001
-				res = hear(rdr);
-				if (res != 250) throw new Exception("Sender rejected");
-				say(wtr, "RCPT TO: <" + address + ">");
-				res = hear(rdr);
-				// be polite
-				say(wtr, "RSET"); hear(rdr);
-				say(wtr, "QUIT"); hear(rdr);
-				if (res != 250)
-					throw new Exception("Address is not valid!");
-				valid = true;
-//				System.out.println("Address is valid!");
-				rdr.close();
-				wtr.close();
-				skt.close();
-			}
-			catch (Exception ex) {
-				// Do nothing but try next host
+        for (Object o : mxList) {
+            boolean valid = false;
+            try {
+                int res;
+//				System.out.println((String) mxList.get(mx)); // this
+//				Socket skt = new Socket((String) mxList.get(mx), 25);
+                Socket skt = new Socket();
+                skt.connect(new InetSocketAddress((String) o, 25), 9000);
+                skt.setSoTimeout(9000);
+                BufferedReader rdr = new BufferedReader
+                        (new InputStreamReader(skt.getInputStream()));
+                BufferedWriter wtr = new BufferedWriter
+                        (new OutputStreamWriter(skt.getOutputStream()));
+                res = hear(rdr);
+                if (res != 220) throw new Exception("Invalid header");
+                say(wtr, "HELO example.com"); // EHLO
+                res = hear(rdr);
+                if (res != 250) throw new Exception("Not ESMTP");
+                // validate the sender address
+                say(wtr, "MAIL FROM: <nam.nlh2000@gmail.com");
+                res = hear(rdr);
+                if (res != 250) throw new Exception("Sender rejected");
+                say(wtr, "RCPT TO: <" + address + ">");
+                res = hear(rdr);
+                // be polite
+                say(wtr, "RSET");
+                hear(rdr);
+                say(wtr, "QUIT");
+                hear(rdr);
+                if (res != 250)
+                    throw new Exception("Address is not valid!");
+                valid = true;
+//				System.out.println("valid is true: " + (String) mxList.get(mx)); // this
+                rdr.close();
+                wtr.close();
+                skt.close();
+            } catch (Exception ex) {
+                // Do nothing but try next host
 //				log.info("[mail validation] remote mail validation error.
 //				Accepting email anyway: email=" + address + " - "
 //				+ e.getMessage());
-			}
-			finally {
-				if (valid) return true;
-			}
-		}
+                System.out.println(ex.getMessage());
+            } finally {
+                if (valid) return true;
+            }
+        }
 		return false;
 	}
-
-	public String call_this_to_validate(String email) {
-		String testData[] = {email};
-		String return_string="";
-		for (int ctr = 0; ctr < testData.length; ctr++) {
-			return_string=(testData[ctr] + " is valid? " +
-					isAddressValid(testData[ctr]));
-		}
-		return return_string;
-	}
-
 }
